@@ -5,7 +5,20 @@ const PORT = process.env.PORT || 8080;
 const ZOOM_SECRET = process.env.ZOOM_SECRET;
 
 const server = http.createServer((req, res) => {
+  const startTime = Date.now();
   const chunks = [];
+
+  // Debug: Show all requests
+  console.log('\n--- Incoming Request ---');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Headers:', req.headers);
+
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'text/plain' });
+    return res.end('Method Not Allowed');
+  }
+
   req.on('data', chunk => chunks.push(chunk));
   req.on('end', () => {
     const rawBuffer = Buffer.concat(chunks);
@@ -18,11 +31,10 @@ const server = http.createServer((req, res) => {
 
       if (!timestamp || !signature) {
         console.log('❌ Missing Zoom headers');
-        res.writeHead(401);
-        return res.end('Unauthorized');
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
+        return res.end('Unauthorized: Missing Zoom headers');
       }
 
-      // --- CORRECT MESSAGE FORMAT ---
       const message = `v0:${timestamp}:${rawBody}`;
       const hash = crypto
         .createHmac('sha256', ZOOM_SECRET)
@@ -30,7 +42,6 @@ const server = http.createServer((req, res) => {
         .digest('hex');
       const expectedSignature = `v0=${hash}`;
 
-      // Logging
       console.log('🔐 Zoom Signature Verification');
       console.log('Timestamp:', timestamp);
       console.log('Raw Body:', rawBody);
@@ -39,7 +50,7 @@ const server = http.createServer((req, res) => {
 
       if (expectedSignature !== signature) {
         console.log('❌ Signature mismatch');
-        res.writeHead(401);
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
         return res.end('Invalid signature');
       }
 
@@ -59,18 +70,20 @@ const server = http.createServer((req, res) => {
         });
 
         console.log('✅ Responding to endpoint validation with:', responseBody);
-
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(responseBody);
+        res.end(responseBody);
+        console.log('Response time:', Date.now() - startTime, 'ms');
+        return;
       }
 
       // Other events
-      res.writeHead(200);
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
       res.end('OK');
+      console.log('Response time:', Date.now() - startTime, 'ms');
 
     } catch (err) {
-      console.error('❌ Error handling request:', err.message);
-      res.writeHead(400);
+      console.error('❌ Error handling request:', err);
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
       res.end('Bad request');
     }
   });
