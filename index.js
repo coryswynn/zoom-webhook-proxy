@@ -1,66 +1,33 @@
-const express = require('express');
-const crypto = require('crypto');
-const fetch = require('node-fetch');
-const app = express();
-app.use(express.json({ verify: (req, res, buf) => req.rawBody = buf }));
+const http = require('http');
 
-const ZOOM_SECRET = process.env.ZOOM_SECRET;
-const SHEETS_WEBHOOK_URL = process.env.SHEETS_WEBHOOK_URL;
+const server = http.createServer((req, res) => {
+  let body = '';
 
-function verifyZoomSignature(req) {
-  const sig = req.headers['x-zm-signature'];
-  const ts = req.headers['x-zm-request-timestamp'];
-  const msg = `${ts}${req.rawBody}`;
-  const hash = crypto.createHmac('sha256', ZOOM_SECRET).update(msg).digest('base64');
-  return hash === sig;
-}
+  req.on('data', chunk => body += chunk);
+  req.on('end', () => {
+    try {
+      const parsed = JSON.parse(body);
 
-app.post('/', async (req, res) => {
-  const headers = req.headers;
-  const body = req.body;
-  const rawBody = req.rawBody.toString();
+      if (parsed.event === 'endpoint.url_validation' && parsed.payload?.plainToken) {
+        const responseBody = JSON.stringify({ plainToken: parsed.payload.plainToken });
 
-  console.log("🔔 Incoming POST");
-  console.log("Headers:", headers);
-  console.log("Body:", body);
-  console.log("RawBody:", rawBody);
+        console.log('✅ Native response:', responseBody);
 
-  // ✅ 1. Handle Zoom's URL validation
-if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
-  const token = body.payload.plainToken;
-  const responseBody = JSON.stringify({ plainToken: token });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(responseBody);
+      }
 
-  console.log("🔑 Responding to Zoom endpoint validation with:");
-  console.log("Response body:", responseBody);
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  return res.end(responseBody);
-}
-
-  // ✅ 2. Verify Zoom signature for real event posts
-  if (!verifyZoomSignature(req)) {
-    console.log("❌ Signature verification failed.");
-    return res.status(401).send('Unauthorized');
-  }
-
-  // ✅ 3. Forward event to Google Sheets
-  try {
-    await fetch(SHEETS_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    console.log("✅ Event forwarded successfully:", body.event);
-    return res.status(200).send('OK');
-  } catch (err) {
-    console.error("🔥 Error forwarding:", err.message);
-    return res.status(500).send('Forward error');
-  }
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('Not validation');
+    } catch (err) {
+      console.error('❌ JSON parse error:', err.message);
+      res.writeHead(400);
+      res.end('Invalid JSON');
+    }
+  });
 });
 
-
-
-app.get('/', (req, res) => res.send('✅ Zoom Webhook Proxy is running!'));
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`Native Zoom webhook listener running on port ${PORT}`);
+});
