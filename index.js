@@ -2,91 +2,71 @@ require('dotenv').config()
 const express = require('express')
 const bodyParser = require('body-parser')
 const crypto = require('crypto')
-const axios = require('axios')
 
 const app = express()
 const port = process.env.PORT || 4000
 
-// Required environment variables
-const ZOOM_SECRET = process.env.ZOOM_WEBHOOK_SECRET_TOKEN
-const GOOGLE_SCRIPT_WEBHOOK_URL = process.env.GOOGLE_SCRIPT_WEBHOOK_URL
-const GOOGLE_SCRIPT_TOKEN = process.env.GOOGLE_SCRIPT_TOKEN
-
 app.use(bodyParser.json())
 
 app.get('/', (req, res) => {
-  res.status(200).send(
-    `Zoom Webhook sample running. Set this URL (with /webhook) as your app's Event notification endpoint.`
-  )
+  res.status(200)
+  res.send(`Zoom Webhook sample successfully running. Set this URL with the /webhook path as your apps Event notification endpoint URL. https://github.com/zoom/webhook-sample`)
 })
 
-app.post('/webhook', async (req, res) => {
-  let response
+app.post('/webhook', (req, res) => {
 
-  console.log('Headers:', req.headers)
-  console.log('Body:', req.body)
+  var response
 
-  const timestamp = req.headers['x-zm-request-timestamp']
-  const zmSignature = req.headers['x-zm-signature']
+  console.log(req.headers)
+  console.log(req.body)
 
-  // Construct the message string exactly as Zoom requires
-  const message = `v0:${timestamp}:${JSON.stringify(req.body)}`
+  // construct the message string
+  const message = `v0:${req.headers['x-zm-request-timestamp']}:${JSON.stringify(req.body)}`
 
-  // Hash the message string with your Webhook Secret Token
-  const hashForVerify = crypto
-    .createHmac('sha256', ZOOM_SECRET)
-    .update(message)
-    .digest('hex')
+  const hashForVerify = crypto.createHmac('sha256', process.env.ZOOM_WEBHOOK_SECRET_TOKEN).update(message).digest('hex')
 
+  // hash the message string with your Webhook Secret Token and prepend the version semantic
   const signature = `v0=${hashForVerify}`
 
-  // Validate the request came from Zoom
-  if (zmSignature === signature) {
-    // Handle endpoint validation
-    if (req.body.event === 'endpoint.url_validation') {
-      const plainToken = req.body.payload.plainToken
-      const encryptedToken = crypto
-        .createHmac('sha256', ZOOM_SECRET)
-        .update(plainToken)
-        .digest('hex')
+  // you validating the request came from Zoom https://marketplace.zoom.us/docs/api-reference/webhook-reference#notification-structure
+  if (req.headers['x-zm-signature'] === signature) {
+
+    // Zoom validating you control the webhook endpoint https://marketplace.zoom.us/docs/api-reference/webhook-reference#validate-webhook-endpoint
+    if(req.body.event === 'endpoint.url_validation') {
+      const hashForValidate = crypto.createHmac('sha256', process.env.ZOOM_WEBHOOK_SECRET_TOKEN).update(req.body.payload.plainToken).digest('hex')
 
       response = {
-        plainToken,
-        encryptedToken
+        message: {
+          plainToken: req.body.payload.plainToken,
+          encryptedToken: hashForValidate
+        },
+        status: 200
       }
 
-      console.log('✅ Responding to endpoint validation:', response)
-      return res.status(200).json(response)
+      console.log(response.message)
+
+      res.status(response.status)
+      res.json(response.message)
     } else {
-      // For all other events, respond OK to Zoom first
-      response = { message: 'Authorized request to Zoom Webhook sample.' }
-      res.status(200).json(response)
-      console.log('✅ Valid event received:', req.body.event)
+      response = { message: 'Authorized request to Zoom Webhook sample.', status: 200 }
 
-      // --- Forward event to Google Apps Script for Google Sheet logging ---
-      try {
-        // POST to Google Apps Script with token field
-        await axios.post(
-          GOOGLE_SCRIPT_WEBHOOK_URL,
-          {
-            ...req.body,
-            token: GOOGLE_SCRIPT_TOKEN // Apps Script expects this!
-          },
-          {
-            headers: { 'Content-Type': 'application/json' }
-          }
-        )
-        console.log('✅ Event sent to Google Apps Script for logging.')
-      } catch (err) {
-        console.error('❌ Failed to send event to Google Apps Script:', err.message)
-      }
+      console.log(response.message)
+
+      res.status(response.status)
+      res.json(response)
+
+      // business logic here, example make API request to Zoom or 3rd party
+
     }
   } else {
-    // Signature did not match
-    response = { message: 'Unauthorized request to Zoom Webhook sample.' }
-    console.log('❌ Invalid signature. Rejecting request.')
-    res.status(401).json(response)
+
+    response = { message: 'Unauthorized request to Zoom Webhook sample.', status: 401 }
+
+    console.log(response.message)
+
+    res.status(response.status)
+    res.json(response)
   }
 })
 
-app.listen(port, () => console.log(`🚀 Zoom Webhook sample listening on port ${port}!`))
+app.listen(port, () => console.log(`Zoom Webhook sample listening on port ${port}!`))
