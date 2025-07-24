@@ -26,6 +26,13 @@ const server = http.createServer((req, res) => {
       const hash = crypto.createHmac('sha256', ZOOM_SECRET).update(message).digest('base64');
       const expectedSignature = `v0=${hash}`;
 
+      // 🧪 Detailed Logging
+      console.log('🔐 Zoom Signature Verification');
+      console.log('Timestamp:', timestamp);
+      console.log('Raw Body:', rawBody);
+      console.log('Expected Signature:', expectedSignature);
+      console.log('Received Signature:', signature);
+
       if (expectedSignature !== signature) {
         console.log('❌ Signature mismatch');
         res.writeHead(401);
