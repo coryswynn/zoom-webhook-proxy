@@ -23,7 +23,7 @@ const server = http.createServer((req, res) => {
       }
 
       const message = `${timestamp}${rawBody}`;
-      const hash = crypto.createHmac('sha256', ZOOM_SECRET).update(message).digest('base64');
+      const hash = crypto.createHmac('sha256', ZOOM_SECRET).update(message).digest('hex');
       const expectedSignature = `v0=${hash}`;
 
       // 🧪 Detailed Logging
