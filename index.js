@@ -16,36 +16,46 @@ function verifyZoomSignature(req) {
 }
 
 app.post('/', async (req, res) => {
+  const headers = req.headers;
   const body = req.body;
+  const rawBody = req.rawBody.toString();
 
-  // Handle Zoom plainToken handshake for validation
+  console.log("🔔 Incoming POST");
+  console.log("Headers:", headers);
+  console.log("Body:", body);
+  console.log("RawBody:", rawBody);
+
+  // ✅ 1. Handle Zoom's handshake (plainToken validation)
   if (body.plainToken && body.encryptedToken) {
+    console.log("🔑 Responding to Zoom validation handshake...");
     return res.status(200).json({
       plainToken: body.plainToken,
       encryptedToken: body.encryptedToken
     });
   }
 
-  // Signature check for regular event POSTs
+  // ✅ 2. Verify HMAC signature for real events
   if (!verifyZoomSignature(req)) {
-    console.log("❌ Signature mismatch");
+    console.log("❌ Signature verification failed.");
     return res.status(401).send('Unauthorized');
   }
 
+  // ✅ 3. Forward to Google Sheets
   try {
-    await fetch(SHEETS_WEBHOOK_URL, {
+    const fwd = await fetch(SHEETS_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
 
-    console.log("✅ Event forwarded:", body.event);
+    console.log("✅ Event forwarded successfully");
     return res.status(200).send('OK');
   } catch (err) {
-    console.error("🔥 Error forwarding:", err.message);
+    console.error("🔥 Error forwarding to Sheets:", err.message);
     return res.status(500).send('Forward error');
   }
 });
+
 
 
 app.get('/', (req, res) => res.send('✅ Zoom Webhook Proxy is running!'));
