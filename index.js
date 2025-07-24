@@ -16,19 +16,37 @@ function verifyZoomSignature(req) {
 }
 
 app.post('/', async (req, res) => {
-  if (!verifyZoomSignature(req)) return res.status(401).send('Unauthorized');
+  const body = req.body;
+
+  // Handle Zoom plainToken handshake for validation
+  if (body.plainToken && body.encryptedToken) {
+    return res.status(200).json({
+      plainToken: body.plainToken,
+      encryptedToken: body.encryptedToken
+    });
+  }
+
+  // Signature check for regular event POSTs
+  if (!verifyZoomSignature(req)) {
+    console.log("❌ Signature mismatch");
+    return res.status(401).send('Unauthorized');
+  }
+
   try {
     await fetch(SHEETS_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(body)
     });
+
+    console.log("✅ Event forwarded:", body.event);
     return res.status(200).send('OK');
   } catch (err) {
-    console.error(err);
+    console.error("🔥 Error forwarding:", err.message);
     return res.status(500).send('Forward error');
   }
 });
+
 
 app.get('/', (req, res) => res.send('✅ Zoom Webhook Proxy is running!'));
 const PORT = process.env.PORT || 3000;
