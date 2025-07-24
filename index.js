@@ -28,9 +28,12 @@ app.post('/', async (req, res) => {
   // ✅ 1. Handle Zoom's URL validation
   if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
     console.log("🔑 Responding to Zoom endpoint validation...");
-    return res.status(200).json({
+
+    // Send exact plainToken response with correct headers
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).send(JSON.stringify({
       plainToken: body.payload.plainToken
-    });
+    }));
   }
 
   // ✅ 2. Verify Zoom signature for real event posts
@@ -54,6 +57,7 @@ app.post('/', async (req, res) => {
     return res.status(500).send('Forward error');
   }
 });
+
 
 
 app.get('/', (req, res) => res.send('✅ Zoom Webhook Proxy is running!'));
