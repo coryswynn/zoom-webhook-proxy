@@ -27,15 +27,14 @@ app.post('/', async (req, res) => {
 
   // ✅ 1. Handle Zoom's URL validation
 if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
-  const responseBody = {
-    plainToken: body.payload.plainToken
-  };
+  const token = body.payload.plainToken;
+  const responseBody = JSON.stringify({ plainToken: token });
 
   console.log("🔑 Responding to Zoom endpoint validation with:");
   console.log("Response body:", responseBody);
 
-  res.setHeader('Content-Type', 'application/json');
-  return res.status(200).send(JSON.stringify(responseBody));
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  return res.end(responseBody);
 }
 
   // ✅ 2. Verify Zoom signature for real event posts
