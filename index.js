@@ -55,15 +55,26 @@ app.post('/webhook', (req, res) => {
       res.status(response.status)
       res.json(response)
 
-      // business logic here, example make API request to Zoom or 3rd party
-
+      // --- THIS IS THE NEW PART: Send event to Google Sheet ---
+      try {
+        await axios.post(
+          process.env.GOOGLE_SCRIPT_WEBHOOK_URL,
+          {
+            ...req.body,
+            token: process.env.GOOGLE_SCRIPT_TOKEN // add the security token
+          },
+          {
+            headers: { 'Content-Type': 'application/json' }
+          }
+        )
+        console.log('✅ Event sent to Google Sheet')
+      } catch (err) {
+        console.error('❌ Failed to send event to Google Sheet:', err.message)
+      }
+      // --- END OF NEW PART ---
     }
   } else {
-
     response = { message: 'Unauthorized request to Zoom Webhook sample.', status: 401 }
-
-    console.log(response.message)
-
     res.status(response.status)
     res.json(response)
   }
