@@ -6,9 +6,7 @@ const ZOOM_SECRET = process.env.ZOOM_SECRET;
 
 const server = http.createServer((req, res) => {
   const chunks = [];
-
   req.on('data', chunk => chunks.push(chunk));
-
   req.on('end', () => {
     const rawBuffer = Buffer.concat(chunks);
     const rawBody = rawBuffer.toString();
@@ -24,19 +22,15 @@ const server = http.createServer((req, res) => {
         return res.end('Unauthorized');
       }
 
-      const message = Buffer.concat([
-        Buffer.from(timestamp, 'utf-8'),
-        rawBuffer
-      ]);
-
+      // --- CORRECT MESSAGE FORMAT ---
+      const message = `v0:${timestamp}:${rawBody}`;
       const hash = crypto
         .createHmac('sha256', ZOOM_SECRET)
         .update(message)
         .digest('hex');
-
       const expectedSignature = `v0=${hash}`;
 
-      // 🧪 Detailed Logging
+      // Logging
       console.log('🔐 Zoom Signature Verification');
       console.log('Timestamp:', timestamp);
       console.log('Raw Body:', rawBody);
@@ -51,27 +45,26 @@ const server = http.createServer((req, res) => {
 
       const body = JSON.parse(rawBody);
 
-      // ✅ Handle endpoint validation
-if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
-  const plainToken = body.payload.plainToken;
-  const encryptedToken = crypto
-    .createHmac('sha256', ZOOM_SECRET)
-    .update(plainToken)
-    .digest('base64');
+      // Handle endpoint validation
+      if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
+        const plainToken = body.payload.plainToken;
+        const encryptedToken = crypto
+          .createHmac('sha256', ZOOM_SECRET)
+          .update(plainToken)
+          .digest('base64');
 
-  const responseBody = JSON.stringify({
-    plainToken,
-    encryptedToken
-  });
+        const responseBody = JSON.stringify({
+          plainToken,
+          encryptedToken
+        });
 
-  console.log('✅ Responding to endpoint validation with:', responseBody);
+        console.log('✅ Responding to endpoint validation with:', responseBody);
 
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  return res.end(responseBody);
-}
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(responseBody);
+      }
 
-
-      // ➕ Handle other events if needed
+      // Other events
       res.writeHead(200);
       res.end('OK');
 
