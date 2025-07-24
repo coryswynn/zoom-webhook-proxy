@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
   res.send(`Zoom Webhook sample successfully running. Set this URL with the /webhook path as your apps Event notification endpoint URL. https://github.com/zoom/webhook-sample`)
 })
 
-app.post('/webhook', (req, res) => {
+app.post('/webhook', async (req, res) => {
 
   var response
 
