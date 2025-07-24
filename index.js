@@ -52,16 +52,24 @@ const server = http.createServer((req, res) => {
       const body = JSON.parse(rawBody);
 
       // ✅ Handle endpoint validation
-      if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
-        const responseBody = JSON.stringify({
-          plainToken: body.payload.plainToken
-        });
+if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
+  const plainToken = body.payload.plainToken;
+  const encryptedToken = crypto
+    .createHmac('sha256', ZOOM_SECRET)
+    .update(plainToken)
+    .digest('base64');
 
-        console.log('✅ Responding with plainToken:', responseBody);
+  const responseBody = JSON.stringify({
+    plainToken,
+    encryptedToken
+  });
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(responseBody);
-      }
+  console.log('✅ Responding to endpoint validation with:', responseBody);
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  return res.end(responseBody);
+}
+
 
       // ➕ Handle other events if needed
       res.writeHead(200);
