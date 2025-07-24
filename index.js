@@ -5,14 +5,16 @@ const PORT = process.env.PORT || 8080;
 const ZOOM_SECRET = process.env.ZOOM_SECRET;
 
 const server = http.createServer((req, res) => {
-  let rawBody = '';
+  const chunks = [];
 
-  req.on('data', chunk => rawBody += chunk);
+  req.on('data', chunk => chunks.push(chunk));
+
   req.on('end', () => {
+    const rawBuffer = Buffer.concat(chunks);
+    const rawBody = rawBuffer.toString();
+
     try {
       const headers = req.headers;
-      const body = JSON.parse(rawBody);
-
       const timestamp = headers['x-zm-request-timestamp'];
       const signature = headers['x-zm-signature'];
 
@@ -22,8 +24,16 @@ const server = http.createServer((req, res) => {
         return res.end('Unauthorized');
       }
 
-      const message = `${timestamp}${rawBody}`;
-      const hash = crypto.createHmac('sha256', ZOOM_SECRET).update(message).digest('hex');
+      const message = Buffer.concat([
+        Buffer.from(timestamp, 'utf-8'),
+        rawBuffer
+      ]);
+
+      const hash = crypto
+        .createHmac('sha256', ZOOM_SECRET)
+        .update(message)
+        .digest('hex');
+
       const expectedSignature = `v0=${hash}`;
 
       // 🧪 Detailed Logging
@@ -38,6 +48,8 @@ const server = http.createServer((req, res) => {
         res.writeHead(401);
         return res.end('Invalid signature');
       }
+
+      const body = JSON.parse(rawBody);
 
       // ✅ Handle endpoint validation
       if (body.event === 'endpoint.url_validation' && body.payload?.plainToken) {
