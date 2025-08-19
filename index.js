@@ -58,17 +58,22 @@ async function appendHop(meeting_uuid, pkey, hop) {
   const oldHops = Array.isArray(data?.hops) ? data.hops : []
   const newHops = oldHops.concat([hop])
 
-  await supabase
-    .from("session_participants")
-  .upsert({
-    meeting_uuid,
-    participant_key,
-    participant_uuid,
-    name: participant?.user_name || null,
-    email: participant?.email || null,
-    role: participant?.role || null,
-    joined_at: event.join_time || now,   // ✅ ensure something is set
-  }, { onConflict: ['meeting_uuid','participant_key'] });
+const now = new Date().toISOString();
+
+await supabase
+  .from("session_participants")
+  .upsert(
+    {
+      meeting_uuid,
+      participant_key,
+      participant_uuid,
+      name: participant?.user_name || null,
+      email: participant?.email || null,
+      role: participant?.role || null,
+      joined_at: event?.participant?.join_time || event?.join_time || now, // ✅ safe fallback
+    },
+    { onConflict: ["meeting_uuid", "participant_key"] }
+  );
 
 /** idempotent upsert of session row */
 async function upsertSession({ meeting_uuid, meeting_id, topic, tz, started_at, ended_at }) {
