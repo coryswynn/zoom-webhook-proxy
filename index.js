@@ -82,6 +82,7 @@ async function upsertParticipant({
   // Always try to upsert — safe, no pre-select required
   const row = {
     meeting_uuid,
+    session_id: meeting_uuid, // 👈 ensure not-null (assuming session_id maps to meeting_uuid)
     participant_key: pkey,
     participant_uuid,
     name,
