@@ -97,8 +97,8 @@ async function upsertParticipant({
     name,
     email,
     role,
-    joined_at: present_from || now,  // ✅ ensures NOT NULL
-    left_at: present_to || null,     // optional, matches your schema
+    joined_at: event?.participant?.join_time || event?.join_time || now, // ✅ never null
+    left_at: event?.participant?.leave_time || null,
     present_from,
     present_to,
     total_minutes: minutesBetween(present_from, present_to),
