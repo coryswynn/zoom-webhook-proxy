@@ -78,21 +78,8 @@ async function upsertParticipant({
   meeting_uuid, pkey, participant_uuid, name, email, role, present_from, present_to
 }) {
   if (!supabase || !meeting_uuid || !pkey) return
-  // fetch existing to preserve earliest present_from if already set
-  const { data } = await supabase
-    .from('session_participants')
-    .select('present_from, present_to, total_minutes')
-    .eq('meeting_uuid', meeting_uuid)
-    .eq('participant_key', pkey)
-    .maybeSingle()
 
-  const earliest = data?.present_from && present_from
-    ? (new Date(present_from) < new Date(data.present_from) ? present_from : data.present_from)
-    : (data?.present_from || present_from)
-
-  const effective_from = earliest || present_from || null
-  const effective_to = present_to || data?.present_to || null
-
+  // Always try to upsert — safe, no pre-select required
   const row = {
     meeting_uuid,
     participant_key: pkey,
@@ -100,15 +87,21 @@ async function upsertParticipant({
     name,
     email,
     role,
-    present_from: effective_from,
-    present_to: effective_to,
-    total_minutes: minutesBetween(effective_from, effective_to)
+    present_from,
+    present_to,
+    total_minutes: minutesBetween(present_from, present_to)
   }
   Object.keys(row).forEach(k => row[k] == null && delete row[k])
 
-  await supabase
+  const { error } = await supabase
     .from('session_participants')
     .upsert(row, { onConflict: 'meeting_uuid,participant_key' })
+
+  if (error) {
+    console.error('❌ upsert participant error:', error.message)
+  } else {
+    console.log('✅ participant upsert ok:', meeting_uuid, pkey)
+  }
 }
 
 /* ---------------- routes ---------------- */
