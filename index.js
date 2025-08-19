@@ -82,37 +82,26 @@ async function upsertParticipant({
   email,
   role,
   present_from,
-  present_to,
+  present_to
 }) {
-  if (!supabase || !meeting_uuid || !pkey) return
-
-  const now = new Date().toISOString()
-
-  // Always try to upsert — safe, no pre-select required
-  const row = {
-    meeting_uuid,
-    session_id: meeting_uuid, // 👈 temporary until you map session_id properly
-    participant_key: pkey,
-    participant_uuid,
-    name,
-    email,
-    role,
-    joined_at: event?.participant?.join_time || event?.join_time || now, // ✅ never null
-    left_at: event?.participant?.leave_time || null,
-    present_from,
-    present_to,
-    total_minutes: minutesBetween(present_from, present_to),
-  }
-  Object.keys(row).forEach(k => row[k] == null && delete row[k])
-
   const { error } = await supabase
     .from("session_participants")
-    .upsert(row, { onConflict: "meeting_uuid,participant_key" })
+    .upsert(
+      {
+        meeting_uuid,
+        participant_key: pkey,
+        participant_uuid,
+        name,
+        email,
+        role,
+        joined_at: present_from || null,
+        left_at: present_to || null
+      },
+      { onConflict: ["meeting_uuid", "participant_key"] }
+    );
 
   if (error) {
-    console.error("❌ upsert participant error:", error.message)
-  } else {
-    console.log("✅ participant upsert ok:", meeting_uuid, pkey)
+    console.error("❌ upsert participant error:", error.message);
   }
 }
 
