@@ -75,33 +75,44 @@ async function upsertSession({ meeting_uuid, meeting_id, topic, tz, started_at, 
 
 /** idempotent upsert of participant row (keyed by meeting_uuid + participant_key) */
 async function upsertParticipant({
-  meeting_uuid, pkey, participant_uuid, name, email, role, present_from, present_to
+  meeting_uuid,
+  pkey,
+  participant_uuid,
+  name,
+  email,
+  role,
+  present_from,
+  present_to,
 }) {
   if (!supabase || !meeting_uuid || !pkey) return
+
+  const now = new Date().toISOString()
 
   // Always try to upsert — safe, no pre-select required
   const row = {
     meeting_uuid,
-    session_id: meeting_uuid, // 👈 ensure not-null (assuming session_id maps to meeting_uuid)
+    session_id: meeting_uuid, // 👈 temporary until you map session_id properly
     participant_key: pkey,
     participant_uuid,
     name,
     email,
     role,
+    joined_at: present_from || now,  // ✅ ensures NOT NULL
+    left_at: present_to || null,     // optional, matches your schema
     present_from,
     present_to,
-    total_minutes: minutesBetween(present_from, present_to)
+    total_minutes: minutesBetween(present_from, present_to),
   }
   Object.keys(row).forEach(k => row[k] == null && delete row[k])
 
   const { error } = await supabase
-    .from('session_participants')
-    .upsert(row, { onConflict: 'meeting_uuid,participant_key' })
+    .from("session_participants")
+    .upsert(row, { onConflict: "meeting_uuid,participant_key" })
 
   if (error) {
-    console.error('❌ upsert participant error:', error.message)
+    console.error("❌ upsert participant error:", error.message)
   } else {
-    console.log('✅ participant upsert ok:', meeting_uuid, pkey)
+    console.log("✅ participant upsert ok:", meeting_uuid, pkey)
   }
 }
 
